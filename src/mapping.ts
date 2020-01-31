@@ -14,7 +14,8 @@ import {
   saveDonnee,
   saveInventaire,
   getInventaireIdById,
-  getLastDonneeId
+  getLastDonneeId,
+  creationInitMongo
 } from "./requests/creation";
 import {
   deleteAge,
@@ -89,7 +90,8 @@ import {
 import { saveDatabase, saveDatabaseFileName } from "./requests/save";
 import {
   exportDonneesByCustomizedFilters,
-  getDonneesByCustomizedFilters
+  getDonneesByCustomizedFilters,
+  getDonneesByCustomizedFiltersMongo
 } from "./requests/view";
 
 const CSV_MIME_TYPE: string = "text/csv";
@@ -103,10 +105,12 @@ export const REQUEST_MAPPING: {
   ) => Promise<any>;
 } = {
   "/api/creation/init": creationInit,
+  "/api/creation/initMongo": creationInitMongo,
   "/api/inventaire/save": saveInventaire,
   "/api/inventaire/find": getInventaireById,
   "/api/inventaire/find_id": getInventaireIdById,
   "/api/donnee/search": getDonneesByCustomizedFilters,
+  "/api/donnee/searchMongo": getDonneesByCustomizedFiltersMongo,
   "/api/donnee/export": exportDonneesByCustomizedFilters,
   "/api/donnee/save": saveDonnee,
   "/api/donnee/delete": deleteDonnee,

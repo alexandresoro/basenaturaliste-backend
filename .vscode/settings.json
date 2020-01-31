@@ -4,5 +4,8 @@
   "eslint.packageManager": "yarn",
   "files.exclude": {
     "dist/": true
+  },
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": true
   }
 }

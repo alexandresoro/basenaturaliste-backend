@@ -26,14 +26,18 @@
     "lodash": "*",
     "mariadb": "*",
     "moment": "*",
+    "mongodb": "*",
     "multiparty": "*",
     "papaparse": "*",
-    "xlsx": "*"
+    "xlsx": "*",
+    "yargs": "*"
   },
   "devDependencies": {
     "@types/lodash": "*",
+    "@types/mongodb": "*",
     "@types/multiparty": "*",
     "@types/node": "10",
+    "@types/yargs": "*",
     "@typescript-eslint/eslint-plugin": "*",
     "@typescript-eslint/parser": "*",
     "basenaturaliste-model": "https://github.com/alexandresoro/basenaturaliste-model#master",

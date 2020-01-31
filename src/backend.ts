@@ -1,82 +1,102 @@
 import * as http from "http";
-import * as _ from "lodash";
 import * as multiparty from "multiparty";
+import yargs from "yargs";
 import { handleHttpRequest, isMultipartContent } from "./http/requestHandling";
+import MongoConnection from "./mongo/mongo-connection";
 
-const DOCKER_ARG = "-docker";
+// Command line options
+const argv = yargs.options({
+  docker: { type: "boolean", default: false },
+  dbHost: { type: "string", default: "localhost" },
+  dbPort: { type: "string", default: "27017" }
+}).argv;
 
-const isDockerMode = process.argv.includes(DOCKER_ARG);
+const isDockerMode = argv.docker;
 
 const hostname = isDockerMode ? "0.0.0.0" : "127.0.0.1";
 const port = 4000;
 
-// HTTP server
-const server = http.createServer(
-  (request: http.IncomingMessage, res: http.ServerResponse) => {
-    console.log(`Method ${request.method}, URL ${request.url}`);
+(async (): Promise<void> => {
+  try {
+    // Initialize MongoDB connection
+    await MongoConnection.initializeConnection(argv);
 
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    // This header is used on client side to extract the file name for the SQL extract for example
-    res.setHeader("Access-Control-Expose-Headers", "Content-Disposition");
+    // HTTP server
+    const server = http.createServer(
+      (request: http.IncomingMessage, res: http.ServerResponse) => {
+        console.log(`Method ${request.method}, URL ${request.url}`);
 
-    if (request.method === "OPTIONS") {
-      // Because of CORS, when the UI is requesting a POST method with a JSON body, it will preflight an OPTIONS call
-      res.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
-      res.setHeader("Access-Control-Max-Age", "86400");
-      res.setHeader(
-        "Access-Control-Allow-Headers",
-        "X-Requested-With, X-HTTP-Method-Override, Content-Type, Accept"
-      );
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        // This header is used on client side to extract the file name for the SQL extract for example
+        res.setHeader("Access-Control-Expose-Headers", "Content-Disposition");
 
-      res.statusCode = 200;
-      res.end();
-    } else if (request.method === "POST") {
-      // Check if the request is a multipart content
-      const isMultipartContentRequest: boolean = isMultipartContent(request);
+        if (request.method === "OPTIONS") {
+          // Because of CORS, when the UI is requesting a POST method with a JSON body, it will preflight an OPTIONS call
+          res.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
+          res.setHeader("Access-Control-Max-Age", "86400");
+          res.setHeader(
+            "Access-Control-Allow-Headers",
+            "X-Requested-With, X-HTTP-Method-Override, Content-Type, Accept"
+          );
 
-      if (isMultipartContentRequest) {
-        const form = new multiparty.Form();
-        const chunksPart = [];
+          res.statusCode = 200;
+          res.end();
+        } else if (request.method === "POST") {
+          // Check if the request is a multipart content
+          const isMultipartContentRequest: boolean = isMultipartContent(
+            request
+          );
 
-        form.on("part", (part) => {
-          if (part.filename) {
-            part.on("data", (chunk) => {
-              chunksPart.push(chunk);
+          if (isMultipartContentRequest) {
+            const form = new multiparty.Form();
+            const chunksPart = [];
+
+            form.on("part", part => {
+              if (part.filename) {
+                part.on("data", chunk => {
+                  chunksPart.push(chunk);
+                });
+                part.on("end", () => {
+                  const fileContent: string = Buffer.concat(
+                    chunksPart
+                  ).toString();
+                  handleHttpRequest(
+                    isDockerMode,
+                    request,
+                    res,
+                    fileContent,
+                    part.filename
+                  );
+                });
+              } else {
+                res.statusCode = 404;
+                res.end();
+                return;
+              }
             });
-            part.on("end", () => {
-              const fileContent: string = Buffer.concat(chunksPart).toString();
-              handleHttpRequest(
-                isDockerMode,
-                request,
-                res,
-                fileContent,
-                part.filename
-              );
-            });
+
+            form.parse(request);
           } else {
-            res.statusCode = 404;
-            res.end();
-            return;
+            const chunks = [];
+            request.on("data", chunk => {
+              chunks.push(chunk);
+            });
+            request.on("end", () => {
+              const postData = JSON.parse(Buffer.concat(chunks).toString());
+              handleHttpRequest(isDockerMode, request, res, postData);
+            });
           }
-        });
-
-        form.parse(request);
-      } else {
-        const chunks = [];
-        request.on("data", (chunk) => {
-          chunks.push(chunk);
-        });
-        request.on("end", () => {
-          const postData = JSON.parse(Buffer.concat(chunks).toString());
-          handleHttpRequest(isDockerMode, request, res, postData);
-        });
+        } else {
+          handleHttpRequest(isDockerMode, request, res);
+        }
       }
-    } else {
-      handleHttpRequest(isDockerMode, request, res);
-    }
-  }
-);
+    );
 
-server.listen(port, hostname, () => {
-  console.log(`Server running at http://${hostname}:${port}/`);
-});
+    server.listen(port, hostname, () => {
+      console.log(`Server running at http://${hostname}:${port}/`);
+    });
+  } catch (e) {
+    console.error(e);
+    process.exit(1);
+  }
+})();

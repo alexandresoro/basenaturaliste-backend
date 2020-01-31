@@ -1,9 +1,20 @@
 import * as _ from "lodash";
 import { HttpParameters } from "../http/httpParameters";
-import { findDonneesByCustomizedFilters } from "../sql-api/sql-api-donnee";
+import {
+  findDonneesByCustomizedFilters,
+  findDonneesByCustomizedFiltersMongo
+} from "../sql-api/sql-api-donnee";
 import {} from "../sql/sql-queries-utils";
 import { writeToExcel } from "../utils/export-excel-utils";
 import { FlatDonnee } from "basenaturaliste-model/flat-donnee.object";
+import { getAllEntriesFromMultipleCollections } from "../mongo/mongo-utils";
+import { IComportementDocument } from "basenaturaliste-model/mongo/IComportementDocument";
+import {
+  BaseNaturalisteCollectionName,
+  AGES_COLLECTIONS,
+  COMPORTEMENTS_COLLECTION
+} from "../mongo/mongo-databases";
+import { IDocumentWithLibelle } from "basenaturaliste-model/mongo/IDocumentWithLibelle";
 
 const MAXIMUM_EXCEL_DATA_SUPPORTED = 50000;
 
@@ -27,6 +38,87 @@ export const getDonneesByCustomizedFilters = async (
   return await findDonneesByCustomizedFilters(httpParameters.postData);
 };
 
+export const getDonneesByCustomizedFiltersMongo = async (
+  httpParameters: HttpParameters
+): Promise<FlatDonnee[]> => {
+  const matchingDocuments = await findDonneesByCustomizedFiltersMongo(
+    httpParameters.postData
+  );
+
+  const arrayFields: BaseNaturalisteCollectionName[] = [
+    COMPORTEMENTS_COLLECTION,
+    "milieux"
+  ];
+
+  const directFieldsDonnees = [
+    {
+      collection: AGES_COLLECTIONS as BaseNaturalisteCollectionName,
+      documentField: "ageId",
+      donneeField: "age"
+    },
+    {
+      collection: "sexes" as BaseNaturalisteCollectionName,
+      documentField: "sexeId",
+      donneeField: "sexe"
+    },
+    {
+      collection: "estimationsNombre" as BaseNaturalisteCollectionName,
+      documentField: "estimationNombreId",
+      donneeField: "estimationNombre"
+    },
+    {
+      collection: "estimationsDistance" as BaseNaturalisteCollectionName,
+      documentField: "estimationDistanceId",
+      donneeField: "estimationDistance"
+    }
+  ];
+
+  const allCollectionEntries = await getAllEntriesFromMultipleCollections(
+    _.concat(
+      [
+        "observateurs",
+        "departements",
+        "communes",
+        "lieudits",
+        "meteos",
+        "classes",
+        "especes"
+      ] as BaseNaturalisteCollectionName[],
+      _.map(
+        directFieldsDonnees,
+        directFieldDonnee => directFieldDonnee.collection
+      ),
+      arrayFields
+    )
+  );
+
+  const allEntriesMap = _.mapValues(allCollectionEntries, entries => {
+    return _.keyBy(entries, entry => {
+      return entry._id.toHexString();
+    });
+  });
+
+  return _.map(matchingDocuments, matchingDocument => {
+    const flatObject = _.assignIn({}, matchingDocument);
+    _.forEach(directFieldsDonnees, directFieldDonnee => {
+      if (flatObject[directFieldDonnee.documentField]) {
+        flatObject[directFieldDonnee.donneeField] = (allEntriesMap[
+          directFieldDonnee.collection
+        ][
+          flatObject[directFieldDonnee.documentField]
+        ] as IDocumentWithLibelle).libelle;
+      }
+    });
+    _.forEach(arrayFields, arrayField => {
+      const elements = _.map(matchingDocument[arrayField], arrayElt => {
+        return allEntriesMap[arrayField][arrayElt.toHexString()];
+      });
+      flatObject[arrayField] = elements;
+    });
+    return flatObject;
+  }) as any;
+};
+
 export const exportDonneesByCustomizedFilters = async (
   httpParameters: HttpParameters
 ): Promise<any> => {
@@ -44,7 +136,7 @@ export const exportDonneesByCustomizedFilters = async (
     });
   }
 
-  const objectsToExport = _.map(donnees, (object) => {
+  const objectsToExport = _.map(donnees, object => {
     return {
       ID: object.id,
       Observateur: object.observateur,

@@ -182,54 +182,7 @@ export const getQueryToFindDonneesByCriterion = (
 
   if (criterion.id) {
     whereTab.push(" t_donnee.id=" + criterion.id);
-  }
-
-  if (
-    criterion.especeGroup.classes &&
-    criterion.especeGroup.classes.length > 0
-  ) {
-    whereTab.push(
-      " t_classe.id IN (" + criterion.especeGroup.classes.join(",") + ")"
-    );
-  }
-
-  if (
-    criterion.especeGroup.especes &&
-    criterion.especeGroup.especes.length > 0
-  ) {
-    whereTab.push(
-      " t_espece.id IN (" + criterion.especeGroup.especes.join(",") + ")"
-    );
-  }
-
-  if (
-    criterion.lieuditGroup.departements &&
-    criterion.lieuditGroup.departements.length > 0
-  ) {
-    whereTab.push(
-      " t_departement.id IN (" +
-        criterion.lieuditGroup.departements.join(",") +
-        ")"
-    );
-  }
-
-  if (
-    criterion.lieuditGroup.communes &&
-    criterion.lieuditGroup.communes.length > 0
-  ) {
-    whereTab.push(
-      " t_commune.id IN (" + criterion.lieuditGroup.communes.join(",") + ")"
-    );
-  }
-
-  if (
-    criterion.lieuditGroup.lieuxdits &&
-    criterion.lieuditGroup.lieuxdits.length > 0
-  ) {
-    whereTab.push(
-      " t_lieudit.id IN (" + criterion.lieuditGroup.lieuxdits.join(",") + ")"
-    );
-  }
+  } /*
 
   if (criterion.sexes && criterion.sexes.length > 0) {
     whereTab.push(" t_sexe.id IN (" + criterion.sexes.join(",") + ")");
@@ -369,9 +322,56 @@ export const getQueryToFindDonneesByCriterion = (
         criterion.milieux.join(",") +
         "))"
     );
+  }*/
+
+  /*if (
+    criterion.especeGroup.classes &&
+    criterion.especeGroup.classes.length > 0
+  ) {
+    whereTab.push(
+      " t_classe.id IN (" + criterion.especeGroup.classes.join(",") + ")"
+    );
   }
 
-  if (whereTab.length > 0) {
+  if (
+    criterion.especeGroup.especes &&
+    criterion.especeGroup.especes.length > 0
+  ) {
+    whereTab.push(
+      " t_espece.id IN (" + criterion.especeGroup.especes.join(",") + ")"
+    );
+  }*/
+
+  /*if (
+    criterion.lieuditGroup.departements &&
+    criterion.lieuditGroup.departements.length > 0
+  ) {
+    whereTab.push(
+      " t_departement.id IN (" +
+        criterion.lieuditGroup.departements.join(",") +
+        ")"
+    );
+  }
+
+  if (
+    criterion.lieuditGroup.communes &&
+    criterion.lieuditGroup.communes.length > 0
+  ) {
+    whereTab.push(
+      " t_commune.id IN (" + criterion.lieuditGroup.communes.join(",") + ")"
+    );
+  }
+
+  if (
+    criterion.lieuditGroup.lieuxdits &&
+    criterion.lieuditGroup.lieuxdits.length > 0
+  ) {
+    whereTab.push(
+      " t_lieudit.id IN (" + criterion.lieuditGroup.lieuxdits.join(",") + ")"
+    );
+  } */ if (
+    whereTab.length > 0
+  ) {
     query += " WHERE";
   }
 

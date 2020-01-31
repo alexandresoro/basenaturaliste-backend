@@ -25,16 +25,15 @@ RUN ncc build backend.js -o build
 FROM node:lts-alpine
 
 ENV DB_HOST 127.0.0.1
-ENV DB_PORT 3306
-ENV DB_USER basenaturaliste
-ENV DB_PASSWORD basenaturaliste
+ENV DB_PORT 27017
 
+# TODO Check what to do for mongo db dump
 RUN apk add mariadb-client
 
 WORKDIR /app/backend
 
 COPY --from=build /app/backend/dist/build/index.js /app/backend/
 
-CMD node index.js -dbHost=${DB_HOST} -dbPort=${DB_PORT} -dbUser=${DB_USER} -dbPassword=${DB_PASSWORD} -docker
+CMD node index.js --dbHost=${DB_HOST} --dbPort=${DB_PORT} --docker
 
 EXPOSE 4000/tcp

@@ -11,6 +11,7 @@
     "plugin:@typescript-eslint/recommended-requiring-type-checking"
   ],
   "rules": {
+    "require-atomic-updates": "warn",
     "@typescript-eslint/array-type": "error",
     "@typescript-eslint/camelcase": "warn",
     "@typescript-eslint/no-inferrable-types": [

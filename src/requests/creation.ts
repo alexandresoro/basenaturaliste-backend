@@ -1,6 +1,7 @@
 import { CreationPage } from "basenaturaliste-model/creation-page.object";
 import { Donnee } from "basenaturaliste-model/donnee.object";
 import { Inventaire } from "basenaturaliste-model/inventaire.object";
+import { IDonneeDocument } from "basenaturaliste-model/mongo/IDonneeDocument";
 import * as _ from "lodash";
 import { HttpParameters } from "../http/httpParameters";
 import { SqlConnection } from "../sql-api/sql-connection";
@@ -70,6 +71,12 @@ import {
   deleteInventaireById,
   findInventaireIdById
 } from "../sql-api/sql-api-inventaire";
+import { getAllEntriesFromMultipleCollections } from "../mongo/mongo-utils";
+import {
+  BaseNaturalisteCollectionName,
+  DONNEES_COLLECTION
+} from "../mongo/mongo-databases";
+import MongoConnection from "../mongo/mongo-connection";
 
 const buildDonneeFromFlatDonneeWithMinimalData = async (
   flatDonnee: FlatDonneeWithMinimalData
@@ -77,13 +84,13 @@ const buildDonneeFromFlatDonneeWithMinimalData = async (
   if (!!flatDonnee && !!flatDonnee.id && !!flatDonnee.inventaireId) {
     const listsResults = await SqlConnection.query(
       getQueryToFindAssociesByInventaireId(flatDonnee.inventaireId) +
-      getQueryToFindMetosByInventaireId(flatDonnee.inventaireId) +
-      getQueryToFindComportementsIdsByDonneeId(flatDonnee.id) +
-      getQueryToFindMilieuxIdsByDonneeId(flatDonnee.id) +
-      getQueryToFindNumberOfDonneesByDoneeeEntityId(
-        "inventaire_id",
-        flatDonnee.inventaireId
-      )
+        getQueryToFindMetosByInventaireId(flatDonnee.inventaireId) +
+        getQueryToFindComportementsIdsByDonneeId(flatDonnee.id) +
+        getQueryToFindMilieuxIdsByDonneeId(flatDonnee.id) +
+        getQueryToFindNumberOfDonneesByDoneeeEntityId(
+          "inventaire_id",
+          flatDonnee.inventaireId
+        )
     );
 
     const inventaire: Inventaire = {
@@ -130,7 +137,7 @@ const getConfigurationValueAsString = (
 ): string => {
   return _.find(
     configurations,
-    (configuration) => configuration.libelle === libelle
+    configuration => configuration.libelle === libelle
   ).value;
 };
 
@@ -148,9 +155,102 @@ const getConfigurationValueAsBoolean = (
   return getConfigurationValueAsNumber(configurations, libelle) === 1;
 };
 
-export const creationInit = async (): Promise<CreationPage> => {
+export const creationInitMongo = async (): Promise<CreationPage> => {
+  const allCollectionEntries = await getAllEntriesFromMultipleCollections([
+    "settings",
+    "observateurs",
+    "departements",
+    "communes",
+    "lieudits",
+    "meteos",
+    "classes",
+    "especes",
+    "ages",
+    "sexes",
+    "estimationsNombre",
+    "estimationsDistance",
+    "comportements",
+    "milieux"
+  ]);
 
-  const [lastDonneeInfo,
+  const numberOfDonnees = await MongoConnection.getCollection(
+    DONNEES_COLLECTION
+  ).estimatedDocumentCount();
+
+  const lastDonneeDocument = await MongoConnection.getCollection<
+    IDonneeDocument
+  >(DONNEES_COLLECTION)
+    .find()
+    .sort({ id: -1 })
+    .limit(1)
+    .next();
+
+  const lastRegroupementDonnee = await MongoConnection.getCollection<
+    IDonneeDocument
+  >(DONNEES_COLLECTION)
+    .find()
+    .sort({ regroupement: -1 })
+    .limit(1)
+    .next();
+
+  const configurations: Configuration[] = (allCollectionEntries.settings as unknown) as Configuration[];
+
+  const creationPage: CreationPage = {
+    lastDonneeId: lastDonneeDocument._id,
+    numberOfDonnees,
+    nextRegroupement: lastRegroupementDonnee.regroupement + 1,
+    defaultObservateurId: getConfigurationValueAsNumber(
+      configurations,
+      KEY_DEFAULT_OBSERVATEUR_ID
+    ),
+    defaultDepartementId: getConfigurationValueAsNumber(
+      configurations,
+      KEY_DEFAULT_DEPARTEMENT_ID
+    ),
+    defaultEstimationNombreId: getConfigurationValueAsNumber(
+      configurations,
+      KEY_DEFAULT_ESTIMATION_NOMBRE_ID
+    ),
+    defaultNombre: getConfigurationValueAsNumber(
+      configurations,
+      KEY_DEFAULT_NOMBRE
+    ),
+    defaultSexeId: getConfigurationValueAsNumber(
+      configurations,
+      KEY_DEFAULT_SEXE_ID
+    ),
+    defaultAgeId: getConfigurationValueAsNumber(
+      configurations,
+      KEY_DEFAULT_AGE_ID
+    ),
+    areAssociesDisplayed: getConfigurationValueAsBoolean(
+      configurations,
+      KEY_ARE_ASSOCIES_DISPLAYED
+    ),
+    isMeteoDisplayed: getConfigurationValueAsBoolean(
+      configurations,
+      KEY_IS_METEO_DISPLAYED
+    ),
+    isDistanceDisplayed: getConfigurationValueAsBoolean(
+      configurations,
+      KEY_IS_DISTANCE_DISPLAYED
+    ),
+    isRegroupementDisplayed: getConfigurationValueAsBoolean(
+      configurations,
+      KEY_IS_REGROUPEMENT_DISPLAYED
+    ),
+    ...(_.omit(allCollectionEntries, "settings") as Record<
+      BaseNaturalisteCollectionName,
+      any[]
+    >)
+  };
+
+  return creationPage;
+};
+
+export const creationInit = async (): Promise<CreationPage> => {
+  const [
+    lastDonneeInfo,
     numberOfDonnees,
     lastRegroupement,
     configuration,
@@ -166,7 +266,9 @@ export const creationInit = async (): Promise<CreationPage> => {
     estimationsNombre,
     estimationsDistance,
     comportements,
-    milieux] = await Promise.all(_.flatten([
+    milieux
+  ] = await Promise.all(
+    _.flatten([
       SqlConnection.query(getQueryToFindLastDonnee()),
       SqlConnection.query(getQueryToFindNumberOfDonnees()),
       SqlConnection.query(getQueryToFindLastRegroupement()),
@@ -186,8 +288,8 @@ export const creationInit = async (): Promise<CreationPage> => {
         "comportement",
         "milieu"
       ])
-    ]));
-
+    ])
+  );
 
   const lastDonnee: Donnee = await buildDonneeFromFlatDonneeWithMinimalData(
     lastDonneeInfo[0]
@@ -369,9 +471,9 @@ export const getDonneeByIdWithContext = async (
   const id: number = +httpParameters.queryParameters.id;
   const results = await SqlConnection.query(
     getQueryToFindDonneeById(id) +
-    getQueryToFindPreviousDonneeByCurrentDonneeId(id) +
-    getQueryToFindNextDonneeByCurrentDonneeId(id) +
-    getQueryToFindDonneeIndexById(id)
+      getQueryToFindPreviousDonneeByCurrentDonneeId(id) +
+      getQueryToFindNextDonneeByCurrentDonneeId(id) +
+      getQueryToFindDonneeIndexById(id)
   );
 
   const donnee = await buildDonneeFromFlatDonneeWithMinimalData(results[0][0]);
@@ -397,8 +499,8 @@ export const getInventaireById = async (
 
   const results = await SqlConnection.query(
     getFindOneByIdQuery(TABLE_INVENTAIRE, inventaireId) +
-    getQueryToFindAssociesByInventaireId(inventaireId) +
-    getQueryToFindMetosByInventaireId(inventaireId)
+      getQueryToFindAssociesByInventaireId(inventaireId) +
+      getQueryToFindMetosByInventaireId(inventaireId)
   );
 
   const inventaire: Inventaire = mapInventaire(results[0][0]);
